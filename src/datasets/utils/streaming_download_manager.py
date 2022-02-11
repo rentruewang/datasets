@@ -77,6 +77,10 @@ MAGIC_NUMBER_MAX_LENGTH = max(
 )
 
 
+class NonStreamableDatasetError(Exception):
+    pass
+
+
 def xjoin(a, *p):
     """
     This function extends os.path.join to support the "::" hop separator. It supports both paths and urls.
@@ -234,6 +238,23 @@ def xisdir(path, use_auth_token: Optional[Union[str, bool]] = None) -> bool:
         return fs.isdir(main_hop)
 
 
+def xrelpath(path, start=None):
+    """Extend `os.path.relpath` function to support remote files.
+
+    Args:
+        path (:obj:`str`): URL path.
+        start (:obj:`str`): Start URL directory path.
+
+    Returns:
+        :obj:`str`
+    """
+    main_hop, *rest_hops = path.split("::")
+    if is_local_path(main_hop):
+        return os.path.relpath(main_hop, start=start) if start else os.path.relpath(main_hop)
+    else:
+        return posixpath.relpath(main_hop, start=start.split("::")[0]) if start else os.path.relpath(main_hop)
+
+
 def _as_posix(path: Path):
     """Extend :meth:`pathlib.PurePath.as_posix` to fix missing slashes after protocol.
 
@@ -366,7 +387,16 @@ def xopen(file: str, mode="r", *args, use_auth_token: Optional[Union[str, bool]]
     else:
         new_kwargs = {}
     kwargs = {**kwargs, **new_kwargs}
-    file_obj = fsspec.open(file, mode=mode, *args, **kwargs).open()
+    try:
+        file_obj = fsspec.open(file, mode=mode, *args, **kwargs).open()
+    except ValueError as e:
+        if str(e) == "Cannot seek streaming HTTP file":
+            raise NonStreamableDatasetError(
+                "Streaming is not possible for this dataset because data host server doesn't support HTTP range "
+                "requests. You can still load this dataset in non-streaming mode by passing `streaming=False` (default)"
+            ) from e
+        else:
+            raise
     _add_retries_to_file_obj_read_method(file_obj)
     return file_obj
 
