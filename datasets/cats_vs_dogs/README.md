@@ -15,9 +15,8 @@ size_categories:
 source_datasets:
 - original
 task_categories:
-- other
-task_ids:
-- other-other-image-classification
+- image-classification
+task_ids: []
 ---
 
 # Dataset Card for Cats Vs. Dogs
@@ -61,7 +60,7 @@ A large set of images of cats and dogs. There are 1738 corrupted images that are
 
 ### Supported Tasks and Leaderboards
 
-- image-classification
+- `image-classification`: The goal of this task is to classify a given image as either containing a cat or a dog. The leaderboard is available [here](https://paperswithcode.com/sota/image-classification-on-cats-vs-dogs).
 
 ### Languages
 
@@ -102,7 +101,7 @@ Class Label Mappings:
 
 |               | train |
 |---------------|------:|
-| # of examples | 23410 |
+| # of examples | 23422 |
 
 ## Dataset Creation
 

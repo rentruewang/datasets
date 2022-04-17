@@ -11,10 +11,10 @@ from typing import Optional
 from datasets import config
 from datasets.commands import BaseDatasetsCLICommand
 from datasets.load import dataset_module_factory, import_main_class
-from datasets.utils import MockDownloadManager
 from datasets.utils.download_manager import DownloadManager
 from datasets.utils.file_utils import DownloadConfig
 from datasets.utils.logging import get_logger, set_verbosity_warning
+from datasets.utils.mock_download_manager import MockDownloadManager
 from datasets.utils.py_utils import map_nested
 
 
@@ -358,7 +358,7 @@ class DummyDataCommand(BaseDatasetsCLICommand):
             try:
                 split_generators = dataset_builder._split_generators(mock_dl_manager)
                 for split_generator in split_generators:
-                    dataset_builder._prepare_split(split_generator)
+                    dataset_builder._prepare_split(split_generator, check_duplicate_keys=False)
                     n_examples_per_split[split_generator.name] = split_generator.split_info.num_examples
             except OSError as e:
                 logger.error(

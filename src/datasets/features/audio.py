@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from io import BytesIO
-from typing import Any, ClassVar, Optional, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Union
 
 import pyarrow as pa
 from packaging import version
@@ -8,6 +8,10 @@ from packaging import version
 from ..table import array_cast
 from ..utils.py_utils import no_op_if_value_is_null
 from ..utils.streaming_download_manager import xopen
+
+
+if TYPE_CHECKING:
+    from .features import FeatureType
 
 
 @dataclass
@@ -68,7 +72,7 @@ class Audio:
             return {"bytes": None, "path": value}
         elif isinstance(value, dict) and "array" in value:
             buffer = BytesIO()
-            sf.write(buffer, value["array"], value["sampling_rate"])
+            sf.write(buffer, value["array"], value["sampling_rate"], format="wav")
             return {"bytes": buffer.getvalue(), "path": value.get("path")}
         elif value.get("bytes") is not None or value.get("path") is not None:
             return {"bytes": value.get("bytes"), "path": value.get("path")}
@@ -108,6 +112,17 @@ class Audio:
             else:
                 array, sampling_rate = self._decode_non_mp3_path_like(path)
         return {"path": path, "array": array, "sampling_rate": sampling_rate}
+
+    def flatten(self) -> Union["FeatureType", Dict[str, "FeatureType"]]:
+        """If in the decodable state, raise an error, otherwise flatten the feature into a dictionary."""
+        from .features import Value
+
+        if self.decode:
+            raise ValueError("Cannot flatten a decoded Audio feature.")
+        return {
+            "bytes": Value("binary"),
+            "path": Value("string"),
+        }
 
     def cast_storage(self, storage: Union[pa.StringArray, pa.StructArray]) -> pa.StructArray:
         """Cast an Arrow array to the Audio arrow storage type.
@@ -161,7 +176,10 @@ class Audio:
             return bytes_
 
         bytes_array = pa.array(
-            [path_to_bytes(x["path"]) if x["bytes"] is None else x["bytes"] for x in storage.to_pylist()],
+            [
+                (path_to_bytes(x["path"]) if x["bytes"] is None else x["bytes"]) if x is not None else None
+                for x in storage.to_pylist()
+            ],
             type=pa.binary(),
         )
         path_array = pa.array([None] * len(storage), type=pa.string()) if drop_paths else storage.field("path")

@@ -314,6 +314,30 @@ class ModuleFactoryTest(TestCase):
                 assert importlib.import_module(module_factory_result.module_path) is not None
 
 
+@pytest.mark.parametrize(
+    "factory_class",
+    [
+        CachedDatasetModuleFactory,
+        CachedMetricModuleFactory,
+        GithubDatasetModuleFactory,
+        GithubMetricModuleFactory,
+        HubDatasetModuleFactoryWithoutScript,
+        HubDatasetModuleFactoryWithScript,
+        LocalDatasetModuleFactoryWithoutScript,
+        LocalDatasetModuleFactoryWithScript,
+        LocalMetricModuleFactory,
+        PackagedDatasetModuleFactory,
+    ],
+)
+def test_module_factories(factory_class):
+    if issubclass(factory_class, (HubDatasetModuleFactoryWithoutScript, HubDatasetModuleFactoryWithScript)):
+        name = "dummy_org/dummy_name"
+    else:
+        name = "dummy_name"
+    factory = factory_class(name)
+    assert factory.name == name
+
+
 class LoadTest(TestCase):
     @pytest.fixture(autouse=True)
     def inject_fixtures(self, caplog):
@@ -649,6 +673,12 @@ def test_load_dataset_zip_text(data_file, streaming, zip_text_path, zip_text_wit
         assert ds.shape[0] == expected_size
         ds_item = next(iter(ds))
         assert ds_item == {"text": "0"}
+
+
+def test_load_dataset_text_with_unicode_new_lines(text_path_with_unicode_new_lines):
+    data_files = str(text_path_with_unicode_new_lines)
+    ds = load_dataset("text", split="train", data_files=data_files)
+    assert ds.num_rows == 3
 
 
 def test_loading_from_the_datasets_hub():

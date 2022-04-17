@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, ClassVar, List, Optional, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Union
 
 import numpy as np
 import pyarrow as pa
@@ -14,6 +14,8 @@ from ..utils.streaming_download_manager import xopen
 
 if TYPE_CHECKING:
     import PIL.Image
+
+    from .features import FeatureType
 
 
 _IMAGE_COMPRESSION_FORMATS: Optional[List[str]] = None
@@ -112,7 +114,21 @@ class Image:
                     image = PIL.Image.open(bytes_)
         else:
             image = PIL.Image.open(BytesIO(bytes_))
+        image.load()  # to avoid "Too many open files" errors
         return image
+
+    def flatten(self) -> Union["FeatureType", Dict[str, "FeatureType"]]:
+        """If in the decodable state, return the feature itself, otherwise flatten the feature into a dictionary."""
+        from .features import Value
+
+        return (
+            self
+            if self.decode
+            else {
+                "bytes": Value("binary"),
+                "path": Value("string"),
+            }
+        )
 
     def cast_storage(self, storage: Union[pa.StringArray, pa.StructArray, pa.ListArray]) -> pa.StructArray:
         """Cast an Arrow array to the Image arrow storage type.
@@ -182,7 +198,10 @@ class Image:
             return bytes_
 
         bytes_array = pa.array(
-            [path_to_bytes(x["path"]) if x["bytes"] is None else x["bytes"] for x in storage.to_pylist()],
+            [
+                (path_to_bytes(x["path"]) if x["bytes"] is None else x["bytes"]) if x is not None else None
+                for x in storage.to_pylist()
+            ],
             type=pa.binary(),
         )
         path_array = pa.array([None] * len(storage), type=pa.string()) if drop_paths else storage.field("path")
